@@ -29,6 +29,15 @@ func Set(c redis.Conn, key, value string) error {
 	return nil
 }
 
+func Exist(c redis.Conn, key string) (bool, error) {
+	s, err := redis.Bool(c.Do("EXISTS", key))
+	if err != nil {
+		return false, fmt.Errorf("redis exists error :%v ", err)
+	}
+
+	return s, nil
+}
+
 func Get(c redis.Conn, key string) (string, error) {
 	s, err := redis.String(c.Do("GET", key))
 	if err != nil {
@@ -64,8 +73,10 @@ L:
 			if s.Scan() {
 				value = s.Text()
 			}
-
-			Set(c, key, value)
+			err := Set(c, key, value)
+			if err != nil {
+				fmt.Println("set error")
+			}
 			fmt.Println("set ", key, ": ", value)
 			fmt.Print("> ")
 		case "get":
@@ -84,7 +95,24 @@ L:
 			}
 			fmt.Println("value: ", v)
 			fmt.Print("> ")
-		case "exit":
+		case "exist":
+			var key string
+			fmt.Print("key: > ")
+			if s.Scan() {
+				key = s.Text()
+			}
+
+			v, err := Exist(c, key)
+			if err != nil {
+				fmt.Println(err)
+			}
+			if v {
+				fmt.Println("存在します")
+			} else {
+				fmt.Println("存在しません")
+			}
+			fmt.Print("> ")
+		case "ex":
 			break L
 		default:
 		}
