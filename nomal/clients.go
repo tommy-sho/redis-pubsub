@@ -19,17 +19,7 @@ func NewPublisher(channel string) *Publisher {
 		pubsub:client.Subscribe(channel),
 	}
 }
-func ExampleNewClient(port string) {
-	client := redis.NewClient(&redis.Options{
-		Addr:     "",
-		Password: "", // no password set
-		DB:       0,  // use default DB
-	})
 
-	pong, err := client.Ping().Result()
-	fmt.Println(pong, err)
-	// Output: PONG <nil>
-}
 func (p Publisher) SubChannel() <-chan *redis.Message{
 	_, err := p.pubsub.Receive()
 	if err != nil {

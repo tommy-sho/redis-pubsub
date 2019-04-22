@@ -1,53 +1,92 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
-	"github.com/go-redis/redis"
-	"github.com/labstack/gommon/log"
-	"time"
+	"log"
+	"os"
+
+	"github.com/garyburd/redigo/redis"
 )
 
-
-func NewRedis() *redis.Client{
-	client := redis.NewClient(
-		&redis.Options{
-			Addr : "localhost:6379",
-			Password:"",
-			DB:0,
-		})
-
-	_, err := client.Ping().Result()
+func NewRedis(host string, port string) redis.Conn {
+	IP_PORT := fmt.Sprintf("%v:%v", host, port)
+	fmt.Println(IP_PORT)
+	c, err := redis.Dial("tcp", IP_PORT)
 	if err != nil {
 		panic(err)
 	}
 
-	return client
+	return c
+}
+
+func Set(c redis.Conn, key, value string) error {
+	_, err := c.Do("SET", key, value)
+	if err != nil {
+		return fmt.Errorf("redis set error :%v ", err)
+	}
+
+	return nil
+}
+
+func Get(c redis.Conn, key string) (string, error) {
+	s, err := redis.String(c.Do("GET", key))
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	return s, nil
 }
 
 func main() {
-
-	publisher := NewPublisher("channel1")
-
-
-	subscriber := Subscriber{
-		ch: publisher.SubChannel(),
-	}
-
-
-	go func() {
-	for i := 0; i < 10; i++ {
-		time.Sleep(1 * time.Second)
-		err := publisher.Publish(time.Now().String())
+	c := NewRedis("localhost", "6379")
+	defer func() {
+		err := c.Close()
 		if err != nil {
-			log.Fatal(err)
+			log.Fatal("canot close redis connection")
+		}
+	}()
+
+	s := bufio.NewScanner(os.Stdin)
+	fmt.Print("> ")
+
+L:
+	for s.Scan() {
+		n := s.Text()
+		switch n {
+		case "set":
+			var key, value string
+			fmt.Print("key: > ")
+			if s.Scan() {
+				key = s.Text()
+			}
+			fmt.Print("value: > ")
+			if s.Scan() {
+				value = s.Text()
+			}
+
+			Set(c, key, value)
+			fmt.Println("set ", key, ": ", value)
+			fmt.Print("> ")
+		case "get":
+			var key string
+			fmt.Print("key: > ")
+			if s.Scan() {
+				key = s.Text()
+			}
+
+			v, err := Get(c, key)
+			if err != nil {
+				fmt.Println(err)
+			}
+			if v == "" {
+				fmt.Println("value はありません")
+			}
+			fmt.Println("value: ", v)
+			fmt.Print("> ")
+		case "exit":
+			break L
+		default:
 		}
 	}
-	publisher.Close()
-}()
-
-	// Consume messages.
-	for msg := range subscriber.ch {
-		fmt.Println(msg.Payload)
-	}
-
 }
