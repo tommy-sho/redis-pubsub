@@ -36,16 +36,20 @@ func (a *ActionRepository) Set(ctx context.Context, accountID string, tweetID st
 func (a *ActionRepository) Get(ctx context.Context, accountID string, tweetID string) (*tweetreader.Action, error) {
 	s, err := a.client.Get(NewKey(accountID, tweetID))
 	if err != nil {
-		return &tweetreader.Action{}, fmt.Errorf("action repository error :%v ", err)
+		if err == redigo.ErrNil {
+			return &tweetreader.Action{}, nil
+		}
+
+		return nil, fmt.Errorf("action repository error :%v ", err)
 	}
 
-	var res *tweetreader.Action
-	err = json.Unmarshal([]byte(s), res)
+	var res tweetreader.Action
+	err = json.Unmarshal([]byte(s), &res)
 	if err != nil {
 		return &tweetreader.Action{}, fmt.Errorf("action repository: json unmershal error :%v ", err)
 	}
 
-	return res, nil
+	return &res, nil
 }
 
 func (a *ActionRepository) GetMulti(ctx context.Context, accountID string, tweetIDs []string) ([]*tweetreader.Action, error) {
@@ -54,21 +58,21 @@ func (a *ActionRepository) GetMulti(ctx context.Context, accountID string, tweet
 	for i, t := range tweetIDs {
 		key := NewKey(accountID, t)
 		action, err := a.client.Get(key)
-		if err != redigo.ErrNil {
-			return nil, fmt.Errorf("action repository error : %v ", err)
+		if err != nil && err == redigo.ErrNil {
+			return nil, fmt.Errorf("action repository error :%v ", err)
 		}
 
 		as[i] = action
 	}
 
 	for i, t := range as {
-		var p *tweetreader.Action
-		err := json.Unmarshal([]byte(t), p)
+		var p tweetreader.Action
+		err := json.Unmarshal([]byte(t), &p)
 		if err != nil {
 			return res, fmt.Errorf("action repository: json unmershal error :%v ", err)
 		}
 
-		res[i] = p
+		res[i] = &p
 	}
 
 	return res, nil

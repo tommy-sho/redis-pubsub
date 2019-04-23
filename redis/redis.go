@@ -39,6 +39,9 @@ func (c Client) Get(key string) (string, error) {
 	conn := c.client.Get()
 	s, err := redis.String(conn.Do("GET", key))
 	if err != nil {
+		if err == redis.ErrNil {
+			return "", err
+		}
 		return "", fmt.Errorf("redis get error :%v ", err)
 	}
 

@@ -2,59 +2,39 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"fmt"
-	"log"
 	"os"
 
-	"github.com/garyburd/redigo/redis"
+	"github.com/tommy-sho/redis-pubsub/tweetreader"
+
+	"github.com/tommy-sho/redis-pubsub/infrastructure"
+	"github.com/tommy-sho/redis-pubsub/redis"
 )
 
-func NewRedis(host string, port string) redis.Conn {
-	IP_PORT := fmt.Sprintf("%v:%v", host, port)
-	fmt.Println(IP_PORT)
-	c, err := redis.Dial("tcp", IP_PORT)
+var (
+	accountID = "10000"
+	tweetID   = "20000"
+)
+
+type Req struct {
+	accountID string
+	tweetID   string
+}
+
+func main() {
+	client, err := redis.NewClient("localhost:6379")
 	if err != nil {
 		panic(err)
 	}
 
-	return c
-}
-
-func Set(c redis.Conn, key, value string) error {
-	_, err := c.Do("SET", key, value)
-	if err != nil {
-		return fmt.Errorf("redis set error :%v ", err)
+	acRep := infrastructure.NewActionRepository(client)
+	ctx := context.Background()
+	a := &tweetreader.Action{
+		IsDidFired:     true,
+		IsDidReply:     true,
+		IsDidRetweeted: true,
 	}
-
-	return nil
-}
-
-func Exist(c redis.Conn, key string) (bool, error) {
-	s, err := redis.Bool(c.Do("EXISTS", key))
-	if err != nil {
-		return false, fmt.Errorf("redis exists error :%v ", err)
-	}
-
-	return s, nil
-}
-
-func Get(c redis.Conn, key string) (string, error) {
-	s, err := redis.String(c.Do("GET", key))
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	return s, nil
-}
-
-func main() {
-	c := NewRedis("localhost", "6379")
-	defer func() {
-		err := c.Close()
-		if err != nil {
-			log.Fatal("canot close redis connection")
-		}
-	}()
 
 	s := bufio.NewScanner(os.Stdin)
 	fmt.Print("> ")
@@ -64,54 +44,60 @@ L:
 		n := s.Text()
 		switch n {
 		case "set":
-			var key, value string
-			fmt.Print("key: > ")
+			fmt.Print("accountID: > ")
 			if s.Scan() {
-				key = s.Text()
+				accountID = s.Text()
 			}
-			fmt.Print("value: > ")
+			fmt.Print("tweetID: > ")
 			if s.Scan() {
-				value = s.Text()
+				tweetID = s.Text()
 			}
-			err := Set(c, key, value)
+			err = acRep.Set(ctx, accountID, tweetID, a)
 			if err != nil {
-				fmt.Println("set error")
+				panic(err)
 			}
-			fmt.Println("set ", key, ": ", value)
 			fmt.Print("> ")
 		case "get":
-			var key string
-			fmt.Print("key: > ")
+			fmt.Print("accountID: > ")
 			if s.Scan() {
-				key = s.Text()
+				accountID = s.Text()
+			}
+			fmt.Print("tweetID: > ")
+			if s.Scan() {
+				tweetID = s.Text()
+			}
+			a, err = acRep.Get(ctx, accountID, tweetID)
+			if err != nil {
+				panic(err)
+			}
+			fmt.Printf("%+v\n", a)
+			fmt.Print("> ")
+		case "mget":
+			var tweetIDs []string
+			fmt.Print("accountID: > ")
+			if s.Scan() {
+				accountID = s.Text()
+			}
+			for {
+				fmt.Print("tweetID: > ")
+				if s.Scan() {
+					tweetID = s.Text()
+				}
+				if tweetID == "ex" {
+					break
+				}
+				tweetIDs = append(tweetIDs, tweetID)
+			}
+			as, err := acRep.GetMulti(ctx, accountID, tweetIDs)
+			if err != nil {
+				panic(err)
+			}
+			for _, t := range as {
+				fmt.Printf("%+v\n", t)
 			}
 
-			v, err := Get(c, key)
-			if err != nil {
-				fmt.Println(err)
-			}
-			if v == "" {
-				fmt.Println("value はありません")
-			}
-			fmt.Println("value: ", v)
 			fmt.Print("> ")
-		case "exist":
-			var key string
-			fmt.Print("key: > ")
-			if s.Scan() {
-				key = s.Text()
-			}
 
-			v, err := Exist(c, key)
-			if err != nil {
-				fmt.Println(err)
-			}
-			if v {
-				fmt.Println("存在します")
-			} else {
-				fmt.Println("存在しません")
-			}
-			fmt.Print("> ")
 		case "ex":
 			break L
 		default:

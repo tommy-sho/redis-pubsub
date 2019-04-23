@@ -1,10 +1,12 @@
 package tweetreader
 
-import "context"
+import (
+	"context"
+)
 
 type Action struct {
 	IsDidFired     bool
-	IsDidRewteeted bool
+	IsDidRetweeted bool
 	IsDidReply     bool
 }
 
