@@ -52,10 +52,12 @@ L:
 			if s.Scan() {
 				tweetID = s.Text()
 			}
+			fmt.Println("a is", a)
 			err = acRep.Set(ctx, accountID, tweetID, a)
 			if err != nil {
 				panic(err)
 			}
+
 			fmt.Print("> ")
 		case "get":
 			fmt.Print("accountID: > ")
@@ -66,11 +68,11 @@ L:
 			if s.Scan() {
 				tweetID = s.Text()
 			}
-			a, err = acRep.Get(ctx, accountID, tweetID)
+			b, err := acRep.Get(ctx, accountID, tweetID)
 			if err != nil {
 				panic(err)
 			}
-			fmt.Printf("%+v\n", a)
+			fmt.Printf("%+v\n", b)
 			fmt.Print("> ")
 		case "mget":
 			var tweetIDs []string

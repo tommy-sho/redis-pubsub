@@ -1,6 +1,7 @@
 package redis
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -25,7 +26,7 @@ func newPool(addr string) *redis.Pool {
 	}
 }
 
-func (c Client) Set(key, value string) error {
+func (c Client) Set(ctx context.Context, key, value string) error {
 	conn := c.client.Get()
 	_, err := conn.Do("SET", key, value)
 	if err != nil {
@@ -35,9 +36,10 @@ func (c Client) Set(key, value string) error {
 	return nil
 }
 
-func (c Client) Get(key string) (string, error) {
+func (c Client) Get(ctx context.Context, key string) (string, error) {
 	conn := c.client.Get()
 	s, err := redis.String(conn.Do("GET", key))
+	fmt.Println(err)
 	if err != nil {
 		if err == redis.ErrNil {
 			return "", err
@@ -46,4 +48,23 @@ func (c Client) Get(key string) (string, error) {
 	}
 
 	return s, nil
+}
+
+func (c Client) MultiGet(ctx context.Context, key []string) ([]string, error) {
+	conn := c.client.Get()
+	var ts []interface{}
+	for _, k := range key {
+		ts = append(ts, k)
+	}
+
+	values, err := redis.Strings(conn.Do("MGET", ts...))
+	fmt.Println(err)
+	if err != nil {
+		if err == redis.ErrNil {
+			return values, err
+		}
+		return nil, fmt.Errorf("redis get error :%v ", err)
+	}
+
+	return values, nil
 }
